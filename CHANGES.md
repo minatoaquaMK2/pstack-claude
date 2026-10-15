@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.87 - add Devin CLI support on upstream 0.9.86
+
+Add Devin CLI packaging, SessionStart routing, and a tool mapping for the shared skills. Setup discovers account model UIDs and creates deterministic pinned profiles without overwriting conflicts. A rerunnable live smoke checks project hooks, skills, and model-profile dispatch. Native installation remains unverified because the test account's organization disables plugins.
+
 ## 0.9.86 - sync to upstream 99743e9 (v0.15.25): adds /in-your-own-words and /sharpen
 
 The upstream pin moves from `997ffc7` to `99743e9`, upstream v0.15.25, 15 pstack commits. `/in-your-own-words` plays back the user's goal and the problem before work starts, and `/sharpen` aims a task the way a top expert would without overspecifying it. `/poteto-help` routes to both. `/ketchup` answers in about 150 words built on real visuals, and the autopilot ticks and replies catch the operator up through it. `principle-fix-root-causes` proposes a cheap always-on signal after a deep dig. `principle-attack-the-premise` and three other principles state their rules as reasoning, and four skills drop marginal sections. The package now carries 39 public skills and 24 principles.
