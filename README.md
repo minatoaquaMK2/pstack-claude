@@ -2,7 +2,7 @@
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/codenyer)
 
-Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack) is an opinionated Cursor skill stack that improves agent outcomes. This is a port for Claude Code, Codex, Pi, GitHub Copilot and other agent harnesses. It tracks upstream and also carries named policy forks, each declared in [`tools/forks.json`](tools/forks.json).
+Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack) is an opinionated Cursor skill stack that improves agent outcomes. This is a port for Claude Code, Codex, Pi, GitHub Copilot, Devin CLI, and other agent harnesses. It tracks upstream and also carries named policy forks, each declared in [`tools/forks.json`](tools/forks.json).
 
 Tell `poteto-mode` your goal and it will invoke the correct workflow for the task. It keeps your code concise, simple and verified.
 
@@ -64,6 +64,27 @@ The Copilot build is tested on Copilot CLI 1.0.87 through 1.0.92. On those versi
 
 </details>
 
+<details>
+<summary><strong>Devin CLI</strong></summary>
+
+Install the plugin from the repository's plugin subdirectory:
+
+```shell
+devin plugins install minatoaquaMK2/pstack-claude#plugins/pstack
+```
+
+For a local checkout, run this from the repository root:
+
+```shell
+devin plugins install --local ./plugins/pstack
+```
+
+Start a new session and run `/pstack:setup-pstack`. Setup lists your account's concrete model UIDs and creates a pinned profile for each confirmed choice. Node.js is required for its portable helper. `inherit-parent` uses Devin's `subagent_general` profile. Thinking levels are part of the model UID.
+
+Project hooks, shared skills, and pinned profiles are tested on Devin CLI 3000.11.92. Native installation is blocked by the test account's organization policy, so native hook discovery remains unverified. See the [Devin runtime reference](docs/reference.md#devin-cli) for the verification boundary and skills-only setup.
+
+</details>
+
 <a id="other-harnesses"></a>
 <details>
 <summary><strong>Other harnesses</strong></summary>
@@ -86,7 +107,7 @@ To update, run `git pull` in the clone, then run the `for` loop again to link sk
 
 ### Configure
 
-pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, and GitHub Copilot, and the pstack extension on Pi. Codex runs the hook only after you trust it through `/hooks`. Other harnesses have no hook.
+pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, GitHub Copilot, and Devin CLI, and the pstack extension on Pi. Codex runs the hook only after you trust it through `/hooks`. Other harnesses have no hook.
 
 Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
 
