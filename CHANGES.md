@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.104 - add Devin CLI support
+
+Add Devin CLI packaging, SessionStart routing, and a tool mapping for the shared skills. Setup discovers account model UIDs and creates deterministic pinned profiles without overwriting conflicts. A rerunnable live smoke checks project hooks, skills, and model-profile dispatch. Native installation remains unverified because the test account's organization disables plugins.
+
 ## 0.9.103 - sync to upstream e73df47 (v0.15.32): adds /statechart and /ketchup-video
 
 The upstream pin moves from `7b353f7` to `e73df47`, upstream v0.15.32, 18 pstack commits. `/statechart` draws how a system moves between states as a Mermaid statechart generated from a TLA+ model, with each bug TLC finds as a numbered path, and also turns an agreed chart into a TLA+ skeleton. Its first run installs TLC and Java with mise, about 305 MB. `/ketchup-video` gives the `/ketchup` catch-up as a short silent video of slides, with the waiting calls as text under it. `/create-formal-verification-skill` now tells the skill it generates to read each TLA+ result with `/statechart`, and `/poteto-help` routes to both new skills. The package now carries 43 public skills and 24 principles.

@@ -12,6 +12,10 @@ case "${1:-}" in
     sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md"
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
+  devin)
+    sheet="${XDG_CONFIG_HOME:-$HOME/.config}/devin/pstack-models.md"
+    reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
+    ;;
   copilot)
     sheet="${COPILOT_HOME:-$HOME/.copilot}/pstack-models.md"
     reader="${COPILOT_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
@@ -21,7 +25,7 @@ case "${1:-}" in
     reader="${MUSE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   *)
-    echo "session-start.sh: unknown runtime '${1:-}' (expected claude, codex, copilot, or muse)" >&2
+    echo "session-start.sh: unknown runtime '${1:-}' (expected claude, codex, copilot, muse, or devin)" >&2
     exit 2
     ;;
 esac
@@ -56,6 +60,14 @@ if [ "$1" = muse ]; then
   printf '%s\n' "$normalized" | PSTACK_HOOKS="${MUSE_PLUGIN_ROOT}/hooks" LC_ALL=C awk -v found="$found" \
     -f "${MUSE_PLUGIN_ROOT}/skills/setup-pstack/scripts/sheet.awk" \
     -f "${MUSE_PLUGIN_ROOT}/hooks/muse-context.awk"
+  exit 0
+fi
+
+if [ "$1" = devin ]; then
+  LC_ALL=C awk -v mapping="${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/references/devin-tools.md" \
+    -f "${CLAUDE_PLUGIN_ROOT}/hooks/json.awk" \
+    -f "${CLAUDE_PLUGIN_ROOT}/hooks/devin-context.awk" \
+    "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md"
   exit 0
 fi
 
