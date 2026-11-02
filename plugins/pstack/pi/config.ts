@@ -57,6 +57,9 @@ export function defaultSettings(readDepth: () => number, env: NodeJS.ProcessEnv 
 interface Sheet {
   text: string;
   hookOff: boolean;
+  // Leaves ask_user_question to another extension: Pi refuses to start when two
+  // extensions register the same tool name.
+  askToolOff: boolean;
   piModels: Map<string, string>;
 }
 
@@ -71,7 +74,12 @@ export function parseSheet(text: string): Sheet {
       if (alias && id) piModels.set(alias, id);
     }
   }
-  return { text, hookOff: lines.some((l) => l === "session hook: off"), piModels };
+  return {
+    text,
+    hookOff: lines.some((l) => l === "session hook: off"),
+    askToolOff: lines.some((l) => l === "pi ask tool: off"),
+    piModels,
+  };
 }
 
 export function readSheet(agentDir: string): Sheet | undefined {
@@ -82,8 +90,16 @@ export function readSheet(agentDir: string): Sheet | undefined {
     // An absent or unreadable sheet leaves the defaults in place, as the session hooks do.
     return undefined;
   }
-  // Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.
-  return parseSheet(bytes.toString(bytes[0] === 0xff && bytes[1] === 0xfe ? "utf16le" : "utf8"));
+  // Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark. A
+  // sheet that is not valid UTF-16 LE counts as absent, as in the session hooks.
+  if (bytes[0] !== 0xff || bytes[1] !== 0xfe) return parseSheet(bytes.toString("utf8"));
+  try {
+    // ignoreBOM keeps the byte-order mark, so parseSheet drops exactly one, as for
+    // UTF-8. A Node built without ICU throws here, and the sheet counts as absent.
+    return parseSheet(new TextDecoder("utf-16le", { fatal: true, ignoreBOM: true }).decode(bytes));
+  } catch {
+    return undefined;
+  }
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.

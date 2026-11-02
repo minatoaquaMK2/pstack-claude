@@ -192,6 +192,18 @@ describe("Devin runtime packaging", () => {
     expect(() => validateDevinManifest({ ...manifest, name: "other" }, { claude, pathExists: () => true })).toThrow('name "other"');
   });
 
+  test("interrogate adversaries can write repros without loosening read-only reviews", () => {
+    const mapping = readFileSync(join(plugin, "skills/poteto-mode/references/devin-tools.md"), "utf8");
+    const note = mapping.split("\n").find((line) => line.startsWith("| `interrogate` |"));
+    expect(note).toContain("separate writable worktree");
+    expect(note).toContain("write and run repro scripts");
+    expect(note).toContain("parent reruns each finding");
+    expect(note).not.toContain("no-write");
+    expect(mapping).toContain("Give read-only reviewers an explicit no-write instruction");
+    expect(mapping).toContain("A read-only role with a pinned UID keeps its generated profile");
+    expect(mapping).toContain("keep their writes out of the parent worktree");
+  });
+
   test("registry preambles cover every Codex note, with no baked-in Devin models", () => {
     const devin = RUNTIMES.find((runtime) => runtime.name === "Devin CLI");
     const leads = loadLeadLines();

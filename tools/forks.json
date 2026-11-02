@@ -1,5 +1,11 @@
 {
   "pstack": {
+    "plugins/pstack/agents/comment-sicko.md": {
+      "kind": "policy",
+      "why": "Sends a comment that states a dependency, platform, vendor, or protocol rule to that system's documentation or source code, makes each kill of one cite the page or file and list it in the report, and marks the comment HOLD when that hunt cannot settle the rule, where the keep list alone would delete it on doubt.",
+      "since": "0.9.106",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/architect/SKILL.md": {
       "kind": "policy",
       "why": "Requires comparing accepted deviations with the saved sketch and rationale, and updating them, before each implementation unit closes.",
@@ -30,15 +36,21 @@
       "since": "0.9.29",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/no-comments/SKILL.md": {
+      "kind": "policy",
+      "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands.",
+      "since": "0.9.106",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/poteto-help/SKILL.md": {
       "kind": "port-feature",
-      "why": "Routes installation, model-sheet loading, and persistent routing preferences to the current runtime's setup sources, including Devin CLI profiles, gives installed playbooks precedence over upstream guides, and keeps the port's public skill loading, hidden principles, verification-skill naming, local-worker advice, driver and built-in equivalents, excluded make-bot-ui row, and orchestrate wording as prose changes in this fork.",
+      "why": "Routes installation, model-sheet loading, and persistent routing preferences to the current runtime's setup sources, including Devin CLI profiles, gives installed playbooks precedence over upstream guides, and keeps the port's public skill loading, hidden principles, verification-skill naming, local-worker advice, driver and built-in equivalents, excluded make-bot-ui row, and orchestrate wording as prose changes in this fork, and routes \"stack them, don't ship\" to Autopilot-stack, because neither autopilot merges.",
       "since": "0.9.71",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the Claude Code, Codex, Pi, GitHub Copilot, Muse, and Devin CLI Platform Adaptation section with its task-tool and todo.md fallback (per task slug when sessions share a checkout), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click.",
+      "why": "Adds the Claude Code, Codex, Pi, GitHub Copilot, Muse, and Devin CLI Platform Adaptation section with its task-tool and todo.md fallback (per task slug when sessions share a checkout), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click and Autopilot-stack as Autopilot-full for PRs that build on each other.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -50,7 +62,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-stack.md": {
       "kind": "policy",
-      "why": "Records each verdict's head SHA, base SHA, base branch, and patch-id, cancels pending merges and leases each push against the captured remote head before the root rewrites or retargets the chain, and re-verifies a verdict whose applicability to the new base is uncertain.",
+      "why": "Records each verdict's head SHA, base SHA, base branch, and patch-id, cancels pending merges and leases each push against the captured remote head before any restack, re-verifies a verdict whose applicability to the new base is uncertain, and lists verdicts in place of the merge-ready list, because Autopilot-full already stops at merge-ready.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -74,7 +86,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/multi-phase-plan.md": {
       "kind": "port-feature",
-      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, write the program objective into standing orders, run the tick as a dynamic-mode /loop that re-reads that objective, run live lanes in worktrees through the driver skill the Non-negotiables resolve instead of on cloud VMs with control-ui or control-cli, name the configured swarm workers model instead of a placeholder, and leave rebase and merge authority to the execution playbook.",
+      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, write the program objective into standing orders, run the tick as a dynamic-mode /loop that re-reads that objective, run live lanes in worktrees through the driver skill the Non-negotiables resolve instead of on cloud VMs with control-ui or control-cli, name the configured swarm workers model instead of a placeholder, leave rebase and merge authority to the execution playbook, and pick Autopilot-stack only when a PR builds on another, because neither autopilot merges.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },
@@ -86,7 +98,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/orchestrate.md": {
       "kind": "port-feature",
-      "why": "Runs workers as background subagents in per-writer worktrees under a ~/.claude/orchestrate store because Claude Code has no cloud worker environment, and keeps human rulings in their original wording.",
+      "why": "Runs workers as background subagents in per-writer worktrees under a ~/.claude/orchestrate store because Claude Code has no cloud worker environment, so store reads need no copy to local disk, and keeps human rulings in their original wording.",
       "since": "0.9.29",
       "upstream": "not-proposed"
     },
@@ -116,13 +128,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/bootstrap.ts": {
       "kind": "policy",
-      "why": "Exits with a clear message when run without bun and installs production dependencies without re-executing itself.",
+      "why": "Exits with a clear message when run without bun and installs production dependencies only.",
       "since": "0.9.11",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/check-plan.mjs": {
       "kind": "port-feature",
-      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, opens and closes a code fence at any indentation so a fence inside a list item counts, and strips a leading byte-order mark before parsing.",
+      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, excludes fenced examples from required section and review-gate text, opens and closes a code fence at any indentation so a fence inside a list item counts, and strips a leading byte-order mark before parsing.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },
@@ -242,7 +254,7 @@
     },
     "plugins/pstack/skills/setup-pstack/SKILL.md": {
       "kind": "port-feature",
-      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels, adds the SessionStart hook toggle and names the Pi extension as a reader of it, lists every runtime's sheet path in a table, routes GitHub Copilot to copilot.md, and numbers its verification and formal verification offers as steps 9 and 10. Routes Devin CLI setup to UID discovery, confirmed choices, and deterministic pinned profiles.",
+      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels and explains Codex's active-turn metadata requirement for session effort, adds the SessionStart hook toggle and names the Pi extension as a reader of it, lists every runtime's sheet path in a table, routes GitHub Copilot to copilot.md, and numbers its verification and formal verification offers as steps 9 and 10. Routes Devin CLI setup to UID discovery, confirmed choices, and deterministic pinned profiles.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -258,10 +270,34 @@
       "since": "0.9.41",
       "upstream": "not-proposed"
     },
-    "plugins/pstack/skills/statechart/scripts/test/statechart.test.mjs": {
+    "plugins/pstack/skills/statechart/scripts/frontends/messages.ts": {
       "kind": "policy",
-      "why": "Resolves TMPDIR before the tests compare paths, because macOS keeps its temp folder under the /var symlink, and skips the rename cases outside Linux, where LD_PRELOAD has no effect, so the suite passes on macOS.",
-      "since": "0.9.103",
+      "why": "Drops the \\r that TLC on Windows leaves at the end of each line, so an end-of-message line closes its message there too.",
+      "since": "0.9.116",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/run.ts": {
+      "kind": "policy",
+      "why": "Kills the worker's process tree with taskkill on Windows, which has no /bin/sh and no process groups.",
+      "since": "0.9.116",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/statechart.ts": {
+      "kind": "policy",
+      "why": "Spawns janitor.ts on Windows in place of the /bin/sh janitor, points the worker's TEMP and TMP at its temp folder as TMPDIR already is, and hides the windows of the detached worker and janitor.",
+      "since": "0.9.116",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/test/cli.test.ts": {
+      "kind": "policy",
+      "why": "Resolves the temp folder before the symlinked-launcher test computes its relative link, because macOS keeps that folder under the /var symlink and the link would otherwise miss the launcher, so the suite passes on macOS.",
+      "since": "0.9.105",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/test/messages.test.ts": {
+      "kind": "policy",
+      "why": "Adds a test that TLC's output with Windows line ends reads as it does with Unix ones.",
+      "since": "0.9.116",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/tdd/SKILL.md": {
@@ -294,6 +330,12 @@
       "kind": "policy",
       "why": "Adds a Report Format section requiring one summary report plus one detail file per subsystem or reviewer.",
       "since": "0.9.11",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/thermos/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Sets both reviewers' model from the thermos reviewers line in pstack-models.md, so the override sheet reaches them.",
+      "since": "0.9.115",
       "upstream": "not-proposed"
     }
   }

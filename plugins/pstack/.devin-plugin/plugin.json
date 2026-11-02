@@ -1,6 +1,6 @@
 {
   "name": "pstack",
-  "version": "0.9.104",
+  "version": "0.9.116",
   "description": "Rigorous agent workflows, shared skills, and per-role model profiles for Devin CLI. Original pstack by Lauren Tan (poteto).",
   "author": {
     "name": "Michael Denyer",

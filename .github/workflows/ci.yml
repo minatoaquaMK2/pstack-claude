@@ -42,6 +42,15 @@ jobs:
           bun-version: "1.4.4"
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      # The runner's first Windows PowerShell launch takes from 2.5 s to over
+      # 10 s, and the run steps above use pwsh, so without this step that cost
+      # lands in the first test. The first ConvertFrom-Json, which the Muse hook
+      # runs on models.json, took 1.5 s to over 10 s in the first Muse test
+      # with a sheet. Paid here, both leave the 10 s timeout to catch a hook
+      # launch that is slow every time.
+      - name: Warm up Windows PowerShell
+        shell: powershell
+        run: "'{}' | ConvertFrom-Json | Out-Null"
       - name: Test Windows session hooks
         run: bun test --timeout 10000 tests/session-hook-windows.test.mjs
         env:
@@ -195,9 +204,23 @@ jobs:
         run: bunx prettier@3.6.2 --check .
 
   statechart:
-    name: Statechart scripts
+    name: Statechart scripts (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Node runs the tests in one file one at a time, and corpus.test.ts took
+    # 180 s on its own runner and 390 s beside the other files. The two
+    # slowest files each get a runner, and the rest share one, so a new test
+    # file lands in the rest.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: corpus
+            files: corpus
+          - group: differential
+            files: differential
+          - group: rest
+            files: "!(corpus|differential)"
     defaults:
       run:
         working-directory: plugins/pstack/skills/statechart/scripts
@@ -205,34 +228,82 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The Node the suite was measured on. It imports crc32 from node:zlib,
-      # which needs Node 20.15, or 22.2 and later.
+      # The Node the suite was measured on. It runs the TypeScript sources
+      # directly, which needs Node 22.18, or 23.6 and later.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24.22.1"
           package-manager-cache: false
-      # TLC_TOOL pins the release and checksum the skill installs with mise,
-      # so the job checks the same jar.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.4"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      # TLC_TOOL in run.ts pins the release and checksum the skill installs
+      # with mise, so the job checks the same jar.
       - name: Download TLC
         env:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
         run: |
           set -eo pipefail
-          pin=$(node --input-type=module -e 'import { TLC_TOOL } from "./tlc-tools.mjs"; const [, sum, version] = TLC_TOOL.match(/sha256:([0-9a-f]{64})\]@(\S+)$/); console.log(version, sum);')
+          pin=$(node -e 'const [, sum, version] = require("fs").readFileSync("run.ts", "utf8").match(/const TLC_TOOL =\s*"[^"]*sha256:([0-9a-f]{64})\]@([^"]+)"/); console.log(version, sum);')
           read -r version sum <<< "$pin"
           curl --fail --location --output "$TLA2TOOLS" "https://github.com/tlaplus/tlaplus/releases/download/v$version/tla2tools.jar"
           echo "$sum  $TLA2TOOLS" | sha256sum --check
-      # The suite skips its PNG cases when the renderer cannot install, so a
-      # failed install fails here instead.
-      - name: Install the renderer
-        env:
-          XDG_CACHE_HOME: ${{ runner.temp }}/xdg
-        run: node --input-type=module -e 'import { loadRenderer } from "./render.mjs"; await loadRenderer();'
+      # The render tests install Pele and Mermaid with npm under XDG_CACHE_HOME.
+      # The watchdog dumps every Node process's stack when a group runs past
+      # 12 minutes, four times the 121 to 180 s each group took in two runs,
+      # and well inside the job limit above.
       - name: Test
         env:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
           XDG_CACHE_HOME: ${{ runner.temp }}/xdg
-        run: JAVA="$(command -v java)" node --test test/statechart.test.mjs
+          WATCHDOG_REPORTS: ${{ runner.temp }}/reports
+          FILES: ${{ matrix.files }}
+        run: |
+          shopt -s extglob failglob
+          # shellcheck disable=SC2206 # FILES is a glob to expand here
+          files=(test/$FILES.test.ts)
+          JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh" node --disable-warning=ExperimentalWarning --test "${files[@]}"
+
+  statechart-windows:
+    name: Statechart on Windows
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: plugins/pstack/skills/statechart/scripts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+          package-manager-cache: false
+      - name: Download TLC
+        env:
+          TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
+        run: |
+          pin=$(node -e 'const [, sum, version] = require("fs").readFileSync("run.ts", "utf8").match(/const TLC_TOOL =\s*"[^"]*sha256:([0-9a-f]{64})\]@([^"]+)"/); console.log(version, sum);')
+          read -r version sum <<< "$pin"
+          curl --fail --location --output "$TLA2TOOLS" "https://github.com/tlaplus/tlaplus/releases/download/v$version/tla2tools.jar"
+          echo "$sum  $TLA2TOOLS" | sha256sum --check
+      # The command spawned /bin/sh and missed TLC's \r\n message ends on
+      # Windows (#345). The checkout has \r\n line ends, so diff ignores them.
+      - name: Chart a spec with a broken rule
+        env:
+          TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
+          OUT: ${{ runner.temp }}/MediaPlayer
+        run: |
+          corpus=test/corpus/MediaPlayer
+          status=0
+          JAVA="${JAVA_HOME_21_X64:?the runner has no Java 21}/bin/java" node --disable-warning=ExperimentalWarning statechart.ts "$corpus/MediaPlayer.tla" --view "$corpus/view.mjs" --out "$OUT" || status=$?
+          echo "statechart exited $status"
+          test "$status" -eq 1
+          diff --strip-trailing-cr "$corpus/report.md" "$OUT/report.md"
+          diff --strip-trailing-cr "$corpus/chart.mmd" "$OUT/chart.mmd"
 
   shellcheck:
     name: Shell scripts

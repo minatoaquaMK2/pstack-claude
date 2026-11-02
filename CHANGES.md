@@ -2,7 +2,81 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.104 - add Devin CLI support
+## 0.9.116 - Run statechart on Windows
+
+Fork integration retains Devin CLI packaging, routing, model profiles, and shared-skill support. Its `interrogate` mapping now gives adversaries isolated writable worktrees for repro scripts and has the parent rerun their findings, matching the updated skill; other read-only reviewers keep their no-write restriction.
+
+`statechart` now runs on Windows. It used to spawn `/bin/sh` to kill the TLC worker and clean up after it, which Windows Node cannot find, so the command crashed with `spawn /bin/sh ENOENT` once TLC finished. On Windows it now kills the worker's process tree with `taskkill`, and a small Node janitor, `janitor.ts`, takes over the `/bin/sh` janitor's cleanup. The worker's `TEMP` and `TMP` now point at the command's temp folder, as `TMPDIR` already did, because Node on Windows reads only those two. Before, TLC's working folder landed in `%TEMP%`, where cleanup after Ctrl-C did not reach it. TLC on Windows also ends each output line with `\r\n`, and the message reader kept the `\r`, so no message closed and a broken rule read as "its output names no rule that broke". The reader now drops a trailing `\r`. A `windows-latest` CI job charts the `MediaPlayer` corpus spec and diffs its `report.md` and `chart.mmd` against the Linux ones. @Adamya05 reported both failures with a patch ([#345](https://github.com/michael-denyer/pstack-claude/issues/345)).
+
+## 0.9.115 - Give the thermos reviewers a model role
+
+`thermos` now reads its model from a `thermos reviewers` line in the `pstack-models.md` sheet, and passes it to both thermo-nuclear reviewers. Before, it set no model, so both reviewers ran on the runtime's default subagent model. On Claude Code that is `CLAUDE_CODE_SUBAGENT_MODEL` when set and the parent's model otherwise, and no sheet line could change it. The role defaults to the `default` tier (`opus`), so `/setup-pstack` lists it and the skill gains a stamped Models section. On GitHub Copilot, which has no default models, a sheet written before this release has no `thermos reviewers` line. The session hook then reports `sheet invalid` and drops the sheet's role lines, and the next skill that needs a role model runs `setup-pstack` first. The re-run offers each saved model as `(current)`. @TomDeLeu-TomTom reported it ([#346](https://github.com/michael-denyer/pstack-claude/issues/346)).
+
+## 0.9.114 - Read malformed UTF-16 sheets the same way in every session hook
+
+The shell, PowerShell, and Pi readers of the model sheet now agree on malformed input. A sheet that starts with the UTF-16 LE byte-order mark but has an odd byte count or an unpaired surrogate counts as missing in all three, so the session hook stays on and adds no role lines. Before, PowerShell and Pi decoded such a sheet loosely and could read `session hook: off` from it. The shell hook no longer prints `iconv`'s error on that sheet. A NUL byte is now part of its line in the shell too, so a line holding one never matches. Before, the shell dropped NUL bytes, which made a UTF-16 sheet without a byte-order mark read as `session hook: off`. `read-sheet.sh` now runs under `LC_ALL=C`, so under a UTF-8 locale macOS `tr` no longer cuts a sheet short at a byte that is not UTF-8. `check-sheet.sh` prints `sheet invalid: cannot decode <sheet>` for a sheet it cannot decode, where it used to exit with no line. The cases are in `sheetCases` and `roleCases`, which every hook's suite runs. Closes [#335](https://github.com/michael-denyer/pstack-claude/issues/335).
+
+setup-pstack's Other runtimes section now names the Muse plugin among the runtimes whose hooks read the `session hook` line ([#336](https://github.com/michael-denyer/pstack-claude/issues/336)).
+
+## 0.9.113 - Resolve Codex session effort from active-turn metadata
+
+Codex's `session` effort now uses a helper to read the current thread's active-turn effort before applying task adjustments and passing `reasoning_effort` explicitly. It rejects completed turns, other threads, and missing or ambiguous metadata. On hosts without that runtime log, the mapping requires an explicit effort choice before dispatching; omitting the field can use the selected model's default. Setup and generated descriptions state this requirement. [#331](https://github.com/michael-denyer/pstack-claude/issues/331) remains open for validation across Codex hosts.
+
+## 0.9.112 - The Muse SessionStart hook runs on Windows without sh
+
+The Muse plugin now declares two SessionStart hooks, so Muse on Windows gets the mandate and the sheet's usable role lines when the harness PATH has no `sh`. `session-start` runs the shared shell script, and `session-start-windows` runs `hooks/session-start.ps1 muse`. Muse's native hook schema takes one command per hook and rejects a per-OS variant such as `commandWindows`, so each hook stands down on the OS the other owns. On a machine without one of the two programs, that hook records a failed spawn at session start and the other delivers the context. @LuckyProtein found and fixed this in [#332](https://github.com/michael-denyer/pstack-claude/pull/332).
+
+`session-start.ps1` takes the runtime name, as `session-start.sh` does, and serves Codex and Muse through one sheet decoder. The decoder now drops one leading byte-order mark, as the shell reader and Pi do, and the script compares sheet text ordinally, as the shell hook compares bytes. PowerShell's `-ccontains` compares by culture, and under ICU globalization, as in pwsh 7, it skips zero-width characters. A `session hook: off` line after a second byte-order mark or a zero-width space used to turn off only the Codex Windows hook; every hook now keeps it on.
+
+**Verified.** `tests/session-hook-sheets.mjs` adds `roleCases`, 35 sheets with the role lines each one adds, and the shell and PowerShell Muse suites both run them. `tests/session-hook-windows.test.mjs` runs the PowerShell hook under `PSTACK_REQUIRE_WINDOWS_HOOK=1` with only the PowerShell directory on PATH, over `sheetCases`, `roleCases`, the XDG and USERPROFILE sheet paths, and the Linux stand-down. `tests/session-hook.test.mjs` covers the shell script standing down under a Windows `uname`. On PowerShell 7.6.9, under both ICU and invariant globalization, `session-start.ps1` prints the same bytes as `session-start.sh` for both runtimes on 59 sheets.
+
+## 0.9.111 - GPT-6.1 Sol replaces GPT-6 Sol everywhere
+
+The Codex worker example and the `sonnet` entry of the Pi `openai` and `openai-codex` tables move from `gpt-6-sol` to `gpt-6.1-sol`. GPT-6.1 Sol is the newer Sol and costs less than GPT-6 Sol, so no role has a reason to stay on the older model. `models.json` no longer names `gpt-6-sol`.
+
+## 0.9.110 - GPT-6.1 Sol is the Codex default and panel Sol
+
+The Codex single-model example is `gpt-6.1-sol`, the model the Pi tables map `opus` to, and the Codex panel example is `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`. The worker example stays `gpt-6-sol`, the model the Pi tables map `sonnet` to.
+
+## 0.9.109 - GPT-6.1 Terra joins the Codex panel
+
+The Codex panel example is `gpt-6-astra`, `gpt-6-sol`, `gpt-6.1-terra`, `gpt-6-luna`, so a ChatGPT panel has four models like the Claude panel. The Pi tables are unchanged, because Pi's model catalog does not list `gpt-6.1-terra`.
+
+## 0.9.108 - watch-pr, ship-pr, and orch run on the first call after an update
+
+`bootstrap.ts` runs the calling script again in a new Bun process after it installs `commander`, as upstream's does. The port had dropped that step in 0.9.23, so the first run after each plugin update imported `commander` in the process that had just installed it. Bun did not find the new `node_modules`, and the run failed with `Cannot find package 'commander'` unless Bun's auto-install fetched the package from the registry. The failure reproduced on macOS and Windows 11 with Bun 1.4.4 under `bun --no-install`. `watch-pr/fresh-install.test.ts` runs each entry point that way from a copy of the scripts with no `node_modules`. [#326](https://github.com/michael-denyer/pstack-claude/issues/326), filed by @Thanaen, found the cause.
+
+## 0.9.107 - Exclude fenced examples from plan requirements
+
+`check-plan.mjs` no longer counts text inside a fenced example toward the required plan guidance, program markers, or review-gate evidence. A plan whose only verification rule or review evidence appears in an example now fails the check. Regression tests cover all three sections.
+
+The Claude Code configuration tests scan tracked and non-ignored files, so session backups under `.remember/` no longer produce false failures.
+
+## 0.9.106 - /no-comments holds comments on dependency and platform rules it cannot settle
+
+[backnotprop/pstack#14](https://github.com/backnotprop/pstack/issues/14), filed by @yasuyuki, reports a `/no-comments` run that marked a correct Cargo comment for deletion, one saying that profile settings come only from the workspace root. The same run ended when a second report was rejected, before any accepted edit landed. The comment-sicko prompt deletes a comment whenever it is unsure a keep clause applies, and it named no source to check a dependency's rule against.
+
+The agent now takes a comment that states a rule of a dependency, platform, vendor, or protocol to that system's documentation or source code. A kill of such a comment cites the page or file that refutes the rule or shows it binds something else, and the report lists each one. When the agent cannot reach either, or what it reads leaves the rule unsettled, the comment stays as a `HOLD` that names the rule and where to check it. `/no-comments` leaves each such `HOLD` in place and reports it open, and it restores as a `HOLD` any kill of such a comment that lacks a refuting citation. A rejected second report now fails `/no-comments` for that report's findings, not for the run, and the accepted findings still go through steps 3 to 6.
+
+Both files are declared policy forks, and five rule pins in `tests/skill-rules.test.mjs` fail if a sync drops either rule. A run of the new prompt with Sonnet on that Cargo comment, with web tools off, kept it as a `HOLD` that named the Cargo Reference page. The previous prompt also kept it in that run, on the model's recollection with no check, so the run does not tell the two prompts apart. The second-rejection path and the reached-but-unsettled path were not run live.
+
+## 0.9.105 - sync to upstream ab1f702 (v0.15.35): statechart compiler, run-proven interrogate findings
+
+The upstream pin moves from `e73df47` to `ab1f702`, upstream v0.15.35, 6 pstack commits. `/statechart` now runs on a TypeScript compiler in place of its 21 `.mjs` scripts. It checks a model and draws it, and it no longer turns an agreed chart into a TLA+ skeleton or audits code against a spec, so the `/statechart` row in `docs/reference.md` and its Codex prompt drop the skeleton. `/interrogate` sends adversaries to break a change or a design and keeps only the findings that a rerun of their command confirms. It reuses arena's runner step, reading the `interrogate reviewers` line in place of `arena runners`, and its reviewer prompt, rubric, lead-judgment, and code-quality references are gone. Its reviewer table went with them, so the generator now stamps an ordinary Models section into it. A subagent that opens a PR no longer runs `interrogate`, only `/deslop` and `/no-comments`. Arena's cross-judge now comes only from a model family other than the parent's, and arena drops or replaces a runner seat the `Agent` tool rejects. `/poteto-mode` restates the user's goal in its first message, its briefs, its PRs, and its final reports. It also runs steers and resumes of running agents in the background, and chains model fallbacks when the `Agent` tool rejects a model. `/ketchup-video` subtitles each slide.
+
+Upstream's Autopilot-full merges each PR itself, and this sync brings its new Autopilot-stack, which is Autopilot-full without the merge, stacking a PR only on a PR it builds on. The port's Autopilot-full still stops at merge-ready for the operator's click. It takes upstream's new blocking rule, so a PR blocks only for a problem that a failing run or a wrong doc line shows, and a problem the PR's base already has does not block it. Autopilot-stack takes upstream's two steps in place of its root-owned linear stack, and keeps the port's merge and restack safety before any restack and its verdict records. The merge and restack safety reference now has the caller coordinate with the owner of each branch a restack rewrites, since owners restack their own PRs. Plans pick Autopilot-stack when a PR builds on another and Autopilot-full when every PR stands alone. Upstream's "autopilot, don't merge" phrase does not route to Autopilot-stack here, because neither autopilot merges.
+
+Three upstream changes do not apply. The one-line `orch/store.ts` change lands in a lock function the port rewrote. The orchestrate step that copies store files to local disk once and never searches the whole store is for a remote store, and the port's store already lives under `~/.claude/orchestrate`. The plan template's new rebase trigger, a known concurrent change to the same files, lands in a checklist item the port replaced, because its execution playbook owns rebases.
+
+Upstream deleted `statechart.test.mjs`, so the port's macOS fork of it is gone. The same `/var` symlink case now needs one line in `test/cli.test.ts`, a declared policy fork. The statechart CI job installs `fast-check` from a new `bun.lock`, reads the TLC pin from `run.ts`, and runs the package's test script, whose render tests install their own renderer. The suite gives 367 pass, 0 fail, 0 skip on macOS with Node 26.12.1 and TLC 1.7.4.
+
+New substitution rules cover arena's default-pool sentences and "a Task error", and the denylist now rejects a bare "Task error" and "re-reads both playbooks from trunk". Two rules whose upstream text is gone were removed. The Pi, Codex, and Copilot mapping notes for `interrogate` no longer say its reviewers run read-only, because its adversaries write repro scripts.
+
+## 0.9.104 - pi ask tool: off leaves ask_user_question to another extension
+
+The Pi extension registered `ask_user_question` unconditionally. Pi refuses to start when two extensions register the same tool name, so an install beside another extension that provides `ask_user_question`, such as a dedicated ask-user-question package, exited 1 with `Tool "ask_user_question" conflicts with <path>` before any session began. A `pi ask tool: off` line in the Pi override sheet now makes the extension skip that registration and leave the name to the other extension; without the line it registers the tool as before. The line follows the `session hook: off` grammar, so only that exact line counts. The sheet rides in the system prompt, so the model sees that another extension owns the tool, and `/setup-pstack` on Pi adds the line when the user runs such an extension. @toomanyopenfiles found and fixed this in [#318](https://github.com/michael-denyer/pstack-claude/pull/318).
+
+`tests/pi/config.test.mjs` pins the line's grammar, and `tests/pi/interaction.test.mjs` proves that an install whose sheet has the line registers the other tools and nothing named `ask_user_question`. `docs/reference.md` and the T13 row of `docs/pi-equivalence.md` document the line, and `pi-tools.md` covers it in the `AskUserQuestion` row and the `setup-pstack` note.
 
 Add Devin CLI packaging, SessionStart routing, and a tool mapping for the shared skills. Setup discovers account model UIDs and creates deterministic pinned profiles without overwriting conflicts. A rerunnable live smoke checks project hooks, skills, and model-profile dispatch. Native installation remains unverified because the test account's organization disables plugins.
 

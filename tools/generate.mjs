@@ -18,7 +18,7 @@
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, and one block per RUNTIMES row: Codex equivalents, Pi IDs)
 //     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
-//     -> setup-pstack's Models section and override-sheet block, and interrogate's reviewer table
+//     -> setup-pstack's Models section and override-sheet block
 //     -> the "## Model names" section of each runtime's mapping file
 //        (poteto-mode/references/codex-tools.md, pi-tools.md, copilot-tools.md)
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
@@ -384,12 +384,6 @@ function sheetRoles(models) {
   ];
 }
 
-function requiredRole(models, label) {
-  const role = models.roles.find((r) => r.role === label);
-  if (!role) throw new Error(`models.json: no "${label}" role, which a stamped region renders from`);
-  return role;
-}
-
 // Every generator-owned region: the file it lives in (repo-relative), how to
 // find it, and what it renders from the model policy. Adding a stamped region
 // means adding a row here; the stray-slug scan exempts exactly these spans.
@@ -400,23 +394,14 @@ export function regions(models) {
     if (!rolesBySkill.has(r.skill)) rolesBySkill.set(r.skill, []);
     rolesBySkill.get(r.skill).push(r);
   }
-  const reviewers = requiredRole(models, "interrogate reviewers").models;
   return [
-    ...[...rolesBySkill]
-      .filter(([skill]) => skill !== "interrogate")
-      .map(([skill, roles]) => ({
-        file: skillFile(skill),
-        name: "Models section",
-        locate: section("Models"),
-        appendHeading: "## Models",
-        render: () => blankPadded(modelsSection(roles)),
-      })),
-    {
-      file: skillFile("interrogate"),
-      name: "reviewer table",
-      locate: tableRows("| Subagent | Default model |", "| Reviewer "),
-      render: () => reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`),
-    },
+    ...[...rolesBySkill].map(([skill, roles]) => ({
+      file: skillFile(skill),
+      name: "Models section",
+      locate: section("Models"),
+      appendHeading: "## Models",
+      render: () => blankPadded(modelsSection(roles)),
+    })),
     ...[...rolesBySkill].map(([skill]) => ({
       file: skillFile(skill),
       name: "Reasoning effort section",
@@ -687,8 +672,9 @@ export function effortSection(levels, defaultEffort) {
     "A role value in the override sheet may name a reasoning effort after its model, as in `opus @xhigh`. " +
     "Levels on Claude Code: " + codeList(levels) + ". Which ones apply depends on the model. " +
     "A value without `@` takes the sheet's `default effort` line, a level or `session`, " +
-    `and ${code(defaultEffort)} when the sheet has no such line. \`session\` sets no effort, so the dispatch ` +
-    "is the usual one. Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
+    `and ${code(defaultEffort)} when the sheet has no such line. On Claude Code, \`session\` sets no effort. ` +
+    "On other runtimes, follow the platform mapping for `session`. " +
+    "Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
     "at every level, and a model name is passed as `model`. " +
     "Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. " +
     "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent`. " +
@@ -747,7 +733,7 @@ export function overrideSheetBlock(models) {
     "an alias entry in a panel list still counts toward that panel's fan-out. " +
     "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
     "the role's subagent then runs at that level, each entry of a panel list on its own. " +
-    "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
+    "`default effort` sets the level for a value without one; `session` uses the runtime's platform mapping to start from the parent session's effort. On Codex this requires active-turn metadata or an explicit effort choice. " +
     "`session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +
