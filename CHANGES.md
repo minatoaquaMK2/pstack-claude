@@ -8,6 +8,8 @@ On Devin CLI inside Herdr (`HERDR_ENV=1`), the roles upstream runs as cloud agen
 
 The new `skills/poteto-mode/scripts/herdr-agent.mjs` starts, waits on, reads, prompts, and stops those sessions, and prints JSON. Completion is a result file the agent writes, not Herdr's `idle` state, because an idle Devin has only ended a turn. The script reads the pane before it reports a phase or sends a prompt, because Herdr 0.9.5 reports Devin 3000.11.234's scope permission dialog as idle. It never types into a dialog. `tests/herdr-agent.test.mjs` drives it against a stand-in `herdr`.
 
+The Devin SessionStart hook adds one sentence when `HERDR_ENV=1`, pointing at the mapping's Herdr section and the script. A live run without it showed why. A Devin session inside Herdr took "spawn a cloud agent" from the `/poteto-mode` prompt, skipped the platform mapping, and built the change itself.
+
 ## 0.9.120 - Pi agent file fixes
 
 Four fixes to the Pi extension's `agent` tool, for the gaps that [#357](https://github.com/michael-denyer/pstack-claude/pull/357) listed after 0.9.119 added user agent files.

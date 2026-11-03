@@ -22,12 +22,12 @@ const temp = () => {
 afterEach(() => dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 const cli = (...args) => spawnSync(process.execPath, [helper, ...args], { encoding: "utf8" });
 
-function hook(sheet, pluginRoot = plugin) {
+function hook(sheet, pluginRoot = plugin, herdr = "") {
   const xdg = temp();
   mkdirSync(join(xdg, "devin"));
   if (sheet !== null) writeSheet(join(xdg, "devin/pstack-models.md"), sheet);
   return spawnSync("sh", [join(pluginRoot, "hooks/session-start.sh"), "devin"], {
-    env: { ...process.env, XDG_CONFIG_HOME: xdg, CLAUDE_PLUGIN_ROOT: pluginRoot }, encoding: "utf8",
+    env: { ...process.env, XDG_CONFIG_HOME: xdg, CLAUDE_PLUGIN_ROOT: pluginRoot, HERDR_ENV: herdr }, encoding: "utf8",
   });
 }
 
@@ -133,6 +133,13 @@ describe("Devin SessionStart", () => {
     });
   }
 
+  test("inside Herdr the note routes cloud-agent roles to herdr-agent.mjs", () => {
+    const parsed = JSON.parse(hook(null, plugin, "1").stdout).hookSpecificOutput.additionalContext;
+    expect(parsed).toContain(`${plugin}/skills/poteto-mode/scripts/herdr-agent.mjs, not run_subagent`);
+    expect(parsed).toContain("Herdr cloud agents section");
+    expect(context(hook(null))).not.toContain("herdr-agent.mjs");
+  });
+
   test("comments and prose around off never disable routing", () => {
     for (const sheet of ["session hook: off # comment\n", "note: session hook: off\n", "`session hook: off`\n"]) context(hook(sheet));
   });
@@ -149,7 +156,7 @@ describe("Devin SessionStart", () => {
     writeFileSync(join(other, "pstack-models.md"), "session hook: off\n");
     const xdg = temp();
     const run = () => spawnSync("sh", [join(plugin, "hooks/session-start.sh"), "devin"], {
-      env: { ...process.env, XDG_CONFIG_HOME: xdg, CODEX_HOME: other, COPILOT_HOME: other, CLAUDE_CONFIG_DIR: other, CLAUDE_PLUGIN_ROOT: plugin }, encoding: "utf8",
+      env: { ...process.env, XDG_CONFIG_HOME: xdg, CODEX_HOME: other, COPILOT_HOME: other, CLAUDE_CONFIG_DIR: other, CLAUDE_PLUGIN_ROOT: plugin, HERDR_ENV: "" }, encoding: "utf8",
     });
     context(run());
     mkdirSync(join(xdg, "devin"));

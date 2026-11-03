@@ -71,6 +71,7 @@ fi
 
 if [ "$1" = devin ]; then
   LC_ALL=C awk -v mapping="${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/references/devin-tools.md" \
+    -v herdr="${HERDR_ENV:-}" -v herdr_script="${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/scripts/herdr-agent.mjs" \
     -f "${CLAUDE_PLUGIN_ROOT}/hooks/json.awk" \
     -f "${CLAUDE_PLUGIN_ROOT}/hooks/devin-context.awk" \
     "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md"
