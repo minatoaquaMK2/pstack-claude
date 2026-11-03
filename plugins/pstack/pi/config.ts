@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,10 @@ export const DEPTH_FLAG = "pstack-depth";
 // Under agentDir, holds each session's agent sessions and prompts. The worktree
 // audit scans it by this name, so a rename must reach that script too.
 export const PSTACK_STATE_DIR = "pstack";
+// Under agentDir, beside the pstack-models.md sheet, holds the user's agent
+// files. Not Pi's `agents`, which other subagent extensions read with their
+// own frontmatter.
+export const USER_AGENTS_DIR = "pstack-agents";
 
 export interface Settings {
   pluginRoot: string;
@@ -144,23 +148,30 @@ export function resolveModel(
 export const GENERAL_PURPOSE = "general-purpose";
 
 interface AgentDefinition {
+  // The agent file it was read from; general-purpose has none.
+  file?: string;
   body: string;
   model?: string;
+  effort?: string;
 }
 
 export function frontmatter(text: string): { fields: Map<string, string>; body: string } {
-  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
+  // Windows editors often save a byte-order mark before the frontmatter.
+  const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
   const fields = new Map<string, string>();
   for (const line of (m?.[1] ?? "").split(/\r?\n/)) {
     const kv = /^([\w-]+):\s*(.*)$/.exec(line);
-    if (kv) fields.set(kv[1], kv[2].trim());
+    // YAML's quotes are not part of the value, so "high" and 'high' read as high.
+    if (kv) fields.set(kv[1], kv[2].trim().replace(/^"([^"\\]*)"$|^'([^']*)'$/, "$1$2"));
   }
   return { fields, body: (m?.[2] ?? text).trim() };
 }
 
-function parseAgentFile(text: string): AgentDefinition {
+function parseAgentFile(file: string, text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
-  return { body, model: fields.get("model") || undefined };
+  // Claude Code's `model: inherit` runs the agent on the parent's model, as no model does.
+  const model = fields.get("model");
+  return { file, body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
 }
 
 // The agent tool's effort parameter: one of models.json's levels.
@@ -171,15 +182,41 @@ export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile
 }
 
 // Claude Code registers each plugin agent file as pstack:<file name>, beside
-// the built-in general-purpose type, which has no agent file.
-export function loadAgentTypes(settings: Pick<Settings, "pluginRoot">): Map<string, AgentDefinition> {
+// the built-in general-purpose type, which has no agent file, and a user agent
+// file under its bare name. A user file only adds a type, never replaces one.
+export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir">): Map<string, AgentDefinition> {
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
   const dir = join(settings.pluginRoot, "agents");
   if (existsSync(dir)) {
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
       const type = `pstack:${basename(file, ".md")}`;
-      types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
+      const path = join(dir, file);
+      types.set(type, parseAgentFile(path, readFileSync(path, "utf8")));
     }
   }
+  for (const [type, def] of userAgentFiles(join(settings.agentDir, USER_AGENTS_DIR))) {
+    if (!types.has(type)) types.set(type, def);
+  }
   return types;
+}
+
+// Each readable .md file in the user's folder, by bare name. A hidden file, such
+// as a macOS ._ sidecar, a name with a colon, which Claude Code keeps for plugin
+// agents, an entry that is not a readable file, and a folder that cannot be
+// listed are skipped, so the user's folder never breaks the plugin's agent types.
+function userAgentFiles(dir: string): [string, AgentDefinition][] {
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith(".") && !f.includes(":")).sort();
+  } catch {
+    return [];
+  }
+  return files.flatMap((file): [string, AgentDefinition][] => {
+    const path = join(dir, file);
+    try {
+      return statSync(path).isFile() ? [[basename(file, ".md"), parseAgentFile(path, readFileSync(path, "utf8"))]] : [];
+    } catch {
+      return [];
+    }
+  });
 }

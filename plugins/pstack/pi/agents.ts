@@ -17,6 +17,9 @@ const STATUS_KEY = "pstack-agents";
 // Claude Code lets agents nest three layers below the main session and withholds
 // the Agent tool at the third.
 const MAX_SPAWN_DEPTH = 3;
+// Names the session a child's permission asks go to. @gotgenes/pi-permission-system
+// relays them there while that session has a UI; without it a child answers them itself.
+const PARENT_SESSION_ENV = "PI_SUBAGENT_PARENT_SESSION";
 
 const endedStatus = Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("stopped")]);
 type EndedStatus = Static<typeof endedStatus>;
@@ -189,6 +192,17 @@ function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<void> {
 
 const now = () => new Date().toISOString();
 
+// A value the call left out came from the agent file, which the caller never
+// saw, so an error over it names that file.
+function fromAgentFile<T>(file: string | undefined, passed: string | undefined, resolve: () => T): T {
+  try {
+    return resolve();
+  } catch (e) {
+    if (passed !== undefined || file === undefined) throw e;
+    throw new Error(`${file}: ${(e as Error).message}`);
+  }
+}
+
 export class AgentRunner {
   private readonly agents = new Map<string, AgentState>();
   // Set once the session tears its agents down; a launch after that would
@@ -197,6 +211,7 @@ export class AgentRunner {
   // The footer of the top-level session only: a child's status would go to its
   // parent's stdout, which the reader ignores.
   private ui?: ExtensionContext["ui"];
+  private ownSessionId?: string;
 
   constructor(
     private readonly pi: ExtensionAPI,
@@ -209,9 +224,10 @@ export class AgentRunner {
     const def = types.get(type);
     if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-    const model = resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel);
-    // Claude Code subagents without an effort run at the session's effort.
-    const thinking = params.effort === undefined ? this.pi.getThinkingLevel() : checkEffort(params.effort, this.settings);
+    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel));
+    // Claude Code subagents without an effort run at their definition's effort, else the session's.
+    const effort = params.effort ?? def.effort;
+    const thinking = effort === undefined ? this.pi.getThinkingLevel() : fromAgentFile(def.file, params.effort, () => checkEffort(effort, this.settings));
 
     const id = `a${randomBytes(8).toString("hex")}`;
     const state = join(this.settings.agentDir, PSTACK_STATE_DIR, ctx.sessionManager.getSessionId());
@@ -233,7 +249,7 @@ export class AgentRunner {
       worktree,
       startedAt: now(),
     };
-    this.attachUi(ctx);
+    this.attachSession(ctx);
     return this.launch(identity, params.prompt, params.run_in_background === true);
   }
 
@@ -244,16 +260,19 @@ export class AgentRunner {
       this.ensureSystemPrompt(identity);
       if (identity.worktree) ensureWorktree(identity.worktree);
     } catch (e) {
-      const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
-      this.agents.set(identity.id, { kind: "ended", record: failed });
-      this.persist(failed);
+      // A resume that cannot launch leaves the agent's record as its last run ended.
+      if (!this.agents.has(identity.id)) {
+        const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
+        this.agents.set(identity.id, { kind: "ended", record: failed });
+        this.persist(failed);
+      }
       throw e;
     }
     const { command, args } = this.settings.pi;
     const child = new PiChild(
       command,
       [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills"), ...childArgs(identity, this.settings.depth)],
-      { cwd: identity.cwd, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
+      { cwd: identity.cwd, env: { [PARENT_SESSION_ENV]: this.ownSessionId }, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
       prompt,
     );
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
@@ -267,7 +286,8 @@ export class AgentRunner {
 
   // From session_start too: a reloaded session can resume an agent with
   // send_message before any agent call.
-  attachUi(ctx: ExtensionContext): void {
+  attachSession(ctx: ExtensionContext): void {
+    this.ownSessionId = ctx.sessionManager.getSessionId();
     if (ctx.hasUI && this.settings.depth === 0) this.ui = ctx.ui;
   }
 

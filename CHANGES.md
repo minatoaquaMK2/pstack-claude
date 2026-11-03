@@ -2,6 +2,36 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.120 - Pi agent file fixes
+
+Four fixes to the Pi extension's `agent` tool, for the gaps that [#357](https://github.com/michael-denyer/pstack-claude/pull/357) listed after 0.9.119 added user agent files.
+
+An agent file's frontmatter now skips a byte-order mark before the `---` and drops YAML quotes around a whole value, so `effort: 'high'` is `high`. A value with a quote of the same kind inside, an escape, or a trailing comment is still read as written. Before, a file saved with a byte-order mark had no fields, and its frontmatter went into the child's system prompt ([#362](https://github.com/michael-denyer/pstack-claude/pull/362)).
+
+A `send_message` resume that cannot set up its system prompt file or its worktree now fails and leaves the agent's record alone. Before, it wrote a failed record over the completed one, so `list_agents` and a reloaded session lost the earlier result ([#363](https://github.com/michael-denyer/pstack-claude/pull/363)).
+
+The `agent` tool's `subagent_type` description now names every type the session starts with, each file in `pstack-agents` included. Before, it named only `general-purpose` and the plugin's four types, so a model found a user type only when told its name ([#364](https://github.com/michael-denyer/pstack-claude/pull/364)).
+
+An invalid `model:` or `effort:` in an agent file now gives an error that starts with the file's path. A bad value passed on the call gives the same error as before ([#365](https://github.com/michael-denyer/pstack-claude/pull/365)).
+
+## 0.9.119 - Pi user agents, agent file effort, and permission asks from Pi agents
+
+Three changes to the Pi extension's `agent` tool, all from @foreztgump.
+
+A `.md` file in `pstack-agents` in the Pi agent directory now adds an agent type under its file name, with no `pstack:` prefix, as a Claude Code user agent has no plugin prefix. A user file never replaces an existing type, so `poteto-agent.md` adds `poteto-agent` beside `pstack:poteto-agent`. A hidden file, an entry that cannot be read, and a name with a colon are skipped, so the folder never breaks the plugin's own types. The extension does not read Pi's `agents` folder, where other subagent extensions keep files whose `tools:` allowlists it would not apply. It ignores a user file's `tools:`, `disallowedTools:`, and `isolation:` fields, so pass `readonly: true` or `isolation: "worktree"` on the call ([#351](https://github.com/michael-denyer/pstack-claude/pull/351)).
+
+An agent file's `effort:` is now the default when the call passes no `effort`, and `model: inherit` runs the agent on the parent's model. As on Claude Code, the call's `model` and `effort` win. The plugin's own agent files set neither field, so pstack's skills run as before ([#352](https://github.com/michael-denyer/pstack-claude/pull/352)).
+
+Each child `pi` process now has `PI_SUBAGENT_PARENT_SESSION` set to the session that started it. With `@gotgenes/pi-permission-system` installed globally, a child's permission ask goes to that session's prompt. Before, the extension cancelled the child's own dialog, and the ask was logged as the user's refusal ([#353](https://github.com/michael-denyer/pstack-claude/pull/353)).
+
+## 0.9.118 - Name the SessionStart hook in Codex and Claude Code
+
+The Codex and Claude Code SessionStart hooks now carry the `statusMessage` the Muse hooks already had, `Loading pstack routing`. Codex titles a hook with that field in its hook review list, which `/hooks` and the startup prompt's "Review hooks" option open, and shows it while the hook runs. Before, the list showed a generic label, so a user approving the hook could not tell it was pstack's. Codex's trust check hashes the whole plugin, so it asks for review after every pstack update; from this release the review list names the hook. Claude Code shows the same text while the hook runs. @teddychan reported it ([#354](https://github.com/michael-denyer/pstack-claude/issues/354)).
+
+## 0.9.117 - Give the no-comments reviewer a model role
+
+`no-comments` now reads its model from a `no-comments reviewer` line in the `pstack-models.md` sheet and passes it to `comment-sicko`. It was the one other skill that, like `thermos` before 0.9.115, spawned a plugin agent with no model, so the sheet could not reach it. The role defaults to the `default` tier (`opus`). On GitHub Copilot, a sheet written before this release lacks the new line, so, as with 0.9.115, the next skill that needs a role model runs `setup-pstack` first and offers each saved model as `(current)`.
+
 ## 0.9.116 - Run statechart on Windows
 
 Fork integration retains Devin CLI packaging, routing, model profiles, and shared-skill support. Its `interrogate` mapping now gives adversaries isolated writable worktrees for repro scripts and has the parent rerun their findings, matching the updated skill; other read-only reviewers keep their no-write restriction.

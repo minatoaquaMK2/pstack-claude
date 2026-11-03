@@ -1,11 +1,11 @@
 // What the agent tool registers and the child command a call produces.
 import { describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
-import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
+import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, pluginRoot, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -75,6 +75,18 @@ describe("agent tool", () => {
     expect(w.invocations()).toEqual([]);
   });
 
+  test("the subagent_type description names every type the session starts with, the user's agent files included", async () => {
+    const { w } = setup();
+    mkdirSync(join(w.agentDir, "pstack-agents"));
+    writeFileSync(join(w.agentDir, "pstack-agents", "scout.md"), "Scout.\n");
+    const pi = await restore(w, []);
+    const { description } = pi.tools.get("agent").parameters.properties.subagent_type;
+    const pluginTypes = readdirSync(join(pluginRoot, "agents")).filter((f) => f.endsWith(".md")).map((f) => `pstack:${f.slice(0, -3)}`);
+    expect(pluginTypes).toContain("pstack:poteto-agent");
+    // Run together in prose, so a name must not continue into a longer one.
+    for (const type of ["general-purpose", ...pluginTypes, "scout"]) expect(description).toMatch(new RegExp(`(?<![\\w:-])${type}(?![\\w-])`));
+  });
+
   test("the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "e", prompt: "x", subagent_type: "general-purpose", effort: "xhigh" }, ctx);
@@ -111,7 +123,7 @@ describe("agent tool", () => {
     expect(statSync(flag(second, "--append-system-prompt")).mode & 0o777).toBe(0o600);
   });
 
-  test("a resume whose system prompt file is gone and whose type no longer has one fails, and no child starts", async () => {
+  test("a resume whose system prompt file is gone and whose type no longer has one fails, no child starts, and the agent keeps its completed record", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "p", prompt: "first", subagent_type: "pstack:poteto-agent" }, ctx);
     rmSync(join(w.agentDir, "pstack", "parent-session", "prompts"), { recursive: true });
@@ -122,10 +134,11 @@ describe("agent tool", () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toContain('its type "pstack:removed" no longer provides one');
     expect(w.invocations()).toHaveLength(1);
-    expect((await listAgents(resumed, ctx)).map((a) => a.status)).toEqual(["failed"]);
+    expect((await listAgents(resumed, ctx)).map((a) => a.status)).toEqual(["completed"]);
+    expect(resumed.entries).toEqual([]);
   });
 
-  test("a system prompt file that cannot be written fails the launch before a worktree or its branch is made", async () => {
+  test("a system prompt file that cannot be written fails a fresh launch, recorded as failed, before a worktree or its branch is made", async () => {
     const { w, pi, ctx } = setup();
     const git = gitRepo(w.cwd);
     const state = join(w.agentDir, "pstack", "parent-session");
@@ -134,6 +147,8 @@ describe("agent tool", () => {
 
     const err = await pi.call("agent", { description: "wt", prompt: "x", subagent_type: "pstack:poteto-agent", isolation: "worktree" }, ctx).catch((e) => e);
     expect(err).toBeInstanceOf(Error);
+    expect((await listAgents(pi, ctx)).map((a) => a.status)).toEqual(["failed"]);
+    expect(pi.entries.map((e) => e.data.status)).toEqual(["failed"]);
     expect(git("worktree", "list").split("\n")).toHaveLength(1);
     expect(git("branch", "--list").split("\n")).toHaveLength(1);
     expect(w.invocations()).toEqual([]);
