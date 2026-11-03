@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.121 - Herdr agents for Devin CLI cloud-agent roles
+
+On Devin CLI inside Herdr (`HERDR_ENV=1`), the roles upstream runs as cloud agents now run as separate Devin sessions that Herdr starts. That covers a whole task handed off, the per-PR owner and verifier in Autopilot-full and Autopilot-stack, and the worker and verifier in Orchestrate. Each session gets its own Herdr workspace and git worktree, runs `poteto-mode` as the owner of its playbook, and keeps `run_subagent` for its own delegates. Every other dispatch still uses `run_subagent`, and nothing changes outside Herdr.
+
+The new `skills/poteto-mode/scripts/herdr-agent.mjs` starts, waits on, reads, prompts, and stops those sessions, and prints JSON. Completion is a result file the agent writes, not Herdr's `idle` state, because an idle Devin has only ended a turn. The script reads the pane before it reports a phase or sends a prompt, because Herdr 0.9.5 reports Devin 3000.11.234's scope permission dialog as idle. It never types into a dialog. `tests/herdr-agent.test.mjs` drives it against a stand-in `herdr`.
+
 ## 0.9.120 - Pi agent file fixes
 
 Four fixes to the Pi extension's `agent` tool, for the gaps that [#357](https://github.com/michael-denyer/pstack-claude/pull/357) listed after 0.9.119 added user agent files.

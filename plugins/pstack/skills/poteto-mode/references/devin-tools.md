@@ -63,6 +63,26 @@ Do not poll unchanged results in a loop. A background permission denial can requ
 
 The observed API has no child messaging, child interruption, stop, or close operation. `kill_shell` controls shell processes, not subagents. Do not claim an abandoned child has stopped. If a workflow requires proving its writer stopped, keep that gate closed until completion is observed or the user stops it through the CLI. A required independent review stays blocked when policy, unavailable profiles, permissions, or capacity prevent an independent reviewer from running. Label an exploratory sequential pass and reduced model diversity honestly.
 
+## Herdr cloud agents
+
+Upstream runs a few roles as cloud agents, each a full agent with its own machine: a whole task handed off ("spawn a cloud agent to `/poteto-mode` build X"), the per-PR owner and verifier in Autopilot-full and Autopilot-stack, and the worker and verifier in Orchestrate. The shared playbooks run those roles as background subagents in their own worktrees. When `HERDR_ENV=1`, run each of them as a Herdr agent instead. A Herdr agent is a separate Devin session in its own Herdr workspace and git worktree. It runs `poteto-mode` as the owner of its own playbook and dispatches its own subagents with `run_subagent`. Every other dispatch stays `run_subagent`. Outside Herdr, every role stays `run_subagent`.
+
+Drive Herdr agents with [`scripts/herdr-agent.mjs`](../scripts/herdr-agent.mjs). Every command prints JSON with a `next` hint on failure.
+
+```bash
+node <poteto-mode>/scripts/herdr-agent.mjs start --name <name> --brief <file> [--base <ref>] [--model <uid>]
+node <poteto-mode>/scripts/herdr-agent.mjs wait --name <name> [--timeout <ms>]
+node <poteto-mode>/scripts/herdr-agent.mjs status|read|stop --name <name>
+node <poteto-mode>/scripts/herdr-agent.mjs send --name <name> --text <prompt>
+```
+
+- Write the brief as a subagent brief: the user's goal, scope, files, success criteria, and the proof to bring back, such as screenshots and a video from the project `verify` skill. `start` branches `herdr/<name>` from `--base` (default `HEAD`) and appends the completion contract.
+- The agent runs with your Devin configuration (`XDG_CONFIG_HOME` and git identity variables are forwarded) and `--permission-mode accept-edits`. There is no sandbox. Pass `--permission-mode` only when the user chose another mode.
+- `wait` returns `done` once the agent writes its result file, `blocked` at a dialog, `idle` after a turn ends without a result, and `gone` when the session exits. Herdr's own `idle` or `done` is not completion.
+- Herdr can report a Devin permission or question dialog as idle, so the script reads the pane before it reports or sends anything. Never answer a dialog for the user. Tell them which agent waits and on what, then wait again.
+- `idle` means the agent asked something or stopped early. `read` it, then `send` the answer or a nudge.
+- You own the agent's work. Review its branch, rerun its evidence on the matching surface, then `stop` it. `stop` keeps the worktree for review and for the worktree-cleanup playbook.
+
 ## Model names
 
 Skills name Claude Code aliases in their Models sections. Devin CLI ships no pstack model defaults. Run `setup-pstack` to choose concrete UIDs from `devin models list`; never substitute a Claude alias or invent a UID.
